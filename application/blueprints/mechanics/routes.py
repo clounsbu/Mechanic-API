@@ -1,8 +1,8 @@
 from .schemas import mechanic_schema, mechanics_schema
 from flask import request, jsonify
 from marshmallow import ValidationError
-from sqlalchemy import select
-from application.models import Mechanic, db
+from sqlalchemy import select, func, desc, outerjoin
+from application.models import Mechanic, service_mechanic, db
 from . import mechanics_bp
 
 # ----------------------ROUTES---------------------------
@@ -75,6 +75,27 @@ def update_mechanic(mechanic_id):
 
     db.session.commit()
     return mechanic_schema.jsonify(mechanic), 200
+
+
+# Get mechanics ranked by most tickets worked on
+@mechanics_bp.route("/ranked/by-tickets", methods=['GET'])
+def get_mechanics_by_tickets():
+    # Subquery to count tickets per mechanic
+    ticket_count = db.session.query(
+        service_mechanic.c.mechanic_id,
+        func.count(service_mechanic.c.service_id).label('ticket_count')
+    ).group_by(service_mechanic.c.mechanic_id).subquery()
+    
+    # Main query joining mechanics with the ticket count
+    query = db.session.query(Mechanic).outerjoin(
+        ticket_count,
+        Mechanic.id == ticket_count.c.mechanic_id
+    ).order_by(
+        desc(func.coalesce(ticket_count.c.ticket_count, 0))
+    )
+    
+    mechanics = query.all()
+    return mechanics_schema.jsonify(mechanics)
 
 
 # Delete specific mechanic

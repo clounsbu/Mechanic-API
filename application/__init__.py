@@ -1,10 +1,11 @@
 # Function that produces flask apps
 from flask import Flask
-from .extensions import ma
+from .extensions import ma, limiter, cache
 from .models import db
 from .blueprints.customers import customers_bp
 from .blueprints.mechanics import mechanics_bp
 from .blueprints.tickets import tickets_bp
+from application.blueprints.items import items_bp
 
 
 def create_app(config_name):
@@ -15,10 +16,13 @@ def create_app(config_name):
     ma.init_app(app)
     # initialize extensions in app
     db.init_app(app)
+    limiter.init_app(app)
+    cache.init_app(app)
 
     # Register blueprints
     app.register_blueprint(customers_bp, url_prefix='/customers')
     app.register_blueprint(mechanics_bp, url_prefix='/mechanics')
     app.register_blueprint(tickets_bp, url_prefix='/tickets')
+    app.register_blueprint(items_bp, url_prefix="/items")
 
     return app

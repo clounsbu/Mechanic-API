@@ -11,3 +11,4 @@ class CustomerSchema(ma.SQLAlchemyAutoSchema):
 customer_schema = CustomerSchema()
 # serializes a list of customers
 customers_schema = CustomerSchema(many=True)
+login_schema = CustomerSchema(exclude=['name', 'phone'])

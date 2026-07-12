@@ -6,6 +6,7 @@ app = create_app('DevelopmentConfig')
 
 # Creates all database tables
 with app.app_context():
+    # db.drop_all()  # Commented out - only use to reset database if needed
     db.create_all()
 
 if __name__ == '__main__':

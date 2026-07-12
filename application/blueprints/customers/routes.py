@@ -1,15 +1,46 @@
-from .schemas import customer_schema, customers_schema
-from flask import request, jsonify
+
+from application.blueprints.customers import customers_bp
+from application.blueprints.customers.schemas import customer_schema, customers_schema, login_schema
+from flask import request, jsonify, session
 from marshmallow import ValidationError
 from sqlalchemy import select
-from application.models import Customer, db
+from application.models import Customer, ServiceTicket, db
 from . import customers_bp
+from application.extensions import limiter, cache
+from application.utils.util import encode_token, token_required
+from application.blueprints.tickets.schemas import tickets_schema
 
 # ----------------------ROUTES---------------------------
+@customers_bp.route("/login", methods=['POST'])
+def login():
+    try:
+        credentials = login_schema.load(request.json)
+        email = credentials['email']
+        password = credentials['password']
+    except ValidationError as e:
+        return jsonify(e.messages), 400
+    
+    query = select(Customer). where(Customer.email == email)
+    customer = db.session.execute(query).scalars().first()
+
+    if customer and customer.password == password:
+        token = encode_token(customer.id)
+
+        response = {
+            "status": "Success",
+            "message": "successfully logged in.",
+            "token": token
+        }
+
+        return jsonify(response), 200
+    else:
+        return jsonify ({"message": "Invalid email or password!"})
+
 
 # Create Customer
 # Creating an endpoint for api
 @customers_bp.route("/", methods=['POST'])
+@limiter.limit("5 per day")  # Limit to 5 requests per day
 def create_customer():
     try:
         customer_data = customer_schema.load(request.json)
@@ -32,12 +63,25 @@ def create_customer():
 
 # Get all Customers
 @customers_bp.route("/", methods=['GET'])
+@cache.cached(timeout=60)  # Cache the response at 60 seconds
 def get_customers():
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
     query = select(Customer)
-    customers = db.session.execute(query).scalars().all()
-
-    return customers_schema.jsonify(customers)
-
+    # Use paginate for pagination
+    pagination = db.paginate(query, page=page, per_page=per_page)
+    customers = pagination.items
+    
+    response = {
+        "customers": customers_schema.dump(customers),
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": page,
+        "per_page": per_page
+    }
+    
+    return jsonify(response)
 
 # Get specific customer
 # Setup endpoint for customers
@@ -52,7 +96,9 @@ def get_customer(customer_id):
     return jsonify({"error": "Customer not found."}), 400
 
 # Update Specific Customer
-@customers_bp.route("/<int:customer_id>", methods=['PUT'])
+@customers_bp.route("/", methods=['PUT'])
+@token_required
+@limiter.limit("5 per month")  # Limit to 5 requests per month
 def update_customer(customer_id):
     customer = db.session.get(Customer, customer_id)
 
@@ -76,15 +122,26 @@ def update_customer(customer_id):
     db.session.commit()
     return customer_schema.jsonify(customer), 200
 
-
     # Delete specific customer
-@customers_bp.route("/<int:customer_id>", methods=['DELETE'])
+@customers_bp.route("/", methods=['DELETE'])
+@token_required
+@limiter.limit("5 per day")  # Limit to 5 requests per day
 def delete_customer(customer_id):
-    customer = db.session.get(Customer, customer_id)
-
-    if not customer:
-        return jsonify({"error": "Customer not found"}), 400
+    query = select(Customer).where(Customer.id == customer_id)
+    customer = db.session.execute(query).scalars().first()
     
     db.session.delete(customer)
     db.session.commit()
     return jsonify({"message": f'Customer id: {customer_id}, Successfully deleted'}), 200
+
+# Get customer's service tickets
+@customers_bp.route("/my-tickets", methods=['GET'])
+@token_required
+def get_customer_tickets(customer_id):
+    query = select(ServiceTicket).where(ServiceTicket.customer_id == customer_id)
+    tickets = db.session.execute(query).scalars().all()
+    
+    if not tickets:
+        return jsonify({"message": "No service tickets found for this customer."}), 200
+    
+    return tickets_schema.jsonify(tickets)

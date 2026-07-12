@@ -2,7 +2,7 @@ from .schemas import ticket_schema, tickets_schema
 from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy import select
-from application.models import ServiceTicket, db
+from application.models import ServiceTicket, Mechanic, Item, db
 from . import tickets_bp
 
 # ----------------------ROUTES---------------------------
@@ -69,3 +69,61 @@ def update_ticket(ticket_id):
 
     db.session.commit()
     return ticket_schema.jsonify(ticket), 200
+
+
+# Edit ticket mechanics
+@tickets_bp.route("/<int:ticket_id>/edit", methods=['PUT'])
+def edit_ticket_mechanics(ticket_id):
+    ticket = db.session.get(ServiceTicket, ticket_id)
+    
+    if not ticket:
+        return jsonify({"error": "Ticket not found"}), 400
+    
+    if request.json is None:
+        return jsonify({"error": "No JSON data received"}), 400
+    
+    remove_ids = request.json.get('remove_ids', [])
+    add_ids = request.json.get('add_ids', [])
+    
+    # Remove mechanics from ticket
+    for mechanic_id in remove_ids:
+        mechanic = db.session.get(Mechanic, mechanic_id)
+        if mechanic and mechanic in ticket.mechanics:
+            ticket.mechanics.remove(mechanic)
+    
+    # Add mechanics to ticket
+    for mechanic_id in add_ids:
+        mechanic = db.session.get(Mechanic, mechanic_id)
+        if mechanic and mechanic not in ticket.mechanics:
+            ticket.mechanics.append(mechanic)
+    
+    db.session.commit()
+    return ticket_schema.jsonify(ticket), 200
+
+
+# Add part to ticket
+@tickets_bp.route("/<int:ticket_id>/add-part", methods=['PUT'])
+def add_part_to_ticket(ticket_id):
+    ticket = db.session.get(ServiceTicket, ticket_id)
+    
+    if not ticket:
+        return jsonify({"error": "Ticket not found"}), 400
+    
+    if request.json is None:
+        return jsonify({"error": "No JSON data received"}), 400
+    
+    item_id = request.json.get('item_id')
+    if not item_id:
+        return jsonify({"error": "item_id is required"}), 400
+    
+    item = db.session.get(Item, item_id)
+    if not item:
+        return jsonify({"error": "Item not found"}), 400
+    
+    if item in ticket.item:
+        return jsonify({"error": "Item already on ticket"}), 400
+    
+    ticket.item.append(item)
+    db.session.commit()
+    return ticket_schema.jsonify(ticket), 200
+

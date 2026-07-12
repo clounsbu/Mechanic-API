@@ -32,9 +32,19 @@ class Customer(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(360), nullable=False, unique=True)
     phone: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
+    password:  Mapped[str] = mapped_column(String(100), nullable=False)
 
     service_tickets: Mapped[List['ServiceTicket']] = db.relationship(back_populates='customer')
     
+    
+
+ticket_item = db.Table(
+    'ticket_item',
+    Base.metadata,
+    db.Column('ticket_id', db.ForeignKey('service_tickets.id')),
+    db.Column('item_id', db.ForeignKey('items.id'))
+)
+
 
 # create service ticket db
 class ServiceTicket(Base):
@@ -48,6 +58,7 @@ class ServiceTicket(Base):
 
     customer: Mapped['Customer'] = db.relationship(back_populates='service_tickets')
     mechanics: Mapped[List['Mechanic']] = db.relationship(secondary=service_mechanic, back_populates='service_tickets')
+    item: Mapped[List['Item']] = db.relationship(secondary=ticket_item, back_populates='service_tickets')
 
 # Create mechanic db
 class Mechanic(Base):
@@ -60,3 +71,16 @@ class Mechanic(Base):
     salary: Mapped[str] = mapped_column(String(7), nullable=False)
 
     service_tickets: Mapped[List['ServiceTicket']] = db.relationship(secondary=service_mechanic, back_populates='mechanics')
+
+
+# Create inventory db
+class Item(Base):
+    __tablename__ = 'items'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    price: Mapped[float] = mapped_column(nullable=False)
+
+    service_tickets: Mapped[List['ServiceTicket']] = db.relationship(secondary=ticket_item, back_populates='item')
+
+
