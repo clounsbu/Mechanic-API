@@ -1,7 +1,7 @@
 from application import create_app
 from application.models import db
 
-app = create_app('DevelopmentConfig')
+app = create_app('ProductionConfig')
 
 
 # Creates all database tables
