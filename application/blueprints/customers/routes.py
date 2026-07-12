@@ -15,10 +15,13 @@ from application.blueprints.tickets.schemas import tickets_schema
 def login():
     try:
         credentials = login_schema.load(request.json)
-        email = credentials['email']
-        password = credentials['password']
     except ValidationError as e:
         return jsonify(e.messages), 400
+
+    email = credentials.get('email')
+    password = credentials.get('password')
+    if not email or not password:
+        return jsonify({"message": "Email and password are required."}), 400
     
     query = select(Customer). where(Customer.email == email)
     customer = db.session.execute(query).scalars().first()
@@ -34,7 +37,7 @@ def login():
 
         return jsonify(response), 200
     else:
-        return jsonify ({"message": "Invalid email or password!"})
+        return jsonify({"message": "Invalid email or password!"}), 400
 
 
 # Create Customer
