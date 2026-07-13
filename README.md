@@ -14,7 +14,7 @@ https://github.com/clounsbu/Mechanic-API
 git clone https://github.com/clounsbu/Mechanic-API.git
 ```
 4. You will see a folder named **Mechanic API**. Open the folder in **Visual Studio Code**.
-5. To view the project open the terminal and type npm run dev and the app will be uploaded.
+5. To view the project open the terminal and type npm run dev and the app will be uploaded.hi
 
 
 ## How to use as a typical user
